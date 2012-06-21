@@ -1,0 +1,21 @@
+{
+  "name": "stormrets-push-client",
+  "preferGlobal": "false",
+  "version": "0.2.0",
+  "author": "Paul Trippett <paul@stormrets.com>",
+  "description": "Receive StormRETS Push messages",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/stormrets/stormrets-push-client.git"
+  },
+  "keywords": [
+    "stormrets"
+  ],
+  "dependencies" : {
+    "websocket"   :  "1.0.6"
+  },
+  "license": "GPL",
+  "engine": {
+    "node": ">=0.6.19"
+  }
+}

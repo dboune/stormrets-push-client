@@ -22,7 +22,7 @@
 // To run you will need to install node.js and the node package manager (npm) //
 // once installed you will need to run the following commands:                //
 //                                                                            //
-//    `npm install faye`                                                      //
+//    `npm install websocket`                                                 //
 //    `npm install mysql` or `npm install tds` or `npm install pg`            //
 //    `node stormrets_push.js`                                                //
 //                                                                            //
@@ -85,26 +85,59 @@ function processProperty(property) {
 /// Do not edit below this line.
 ///
 
+console.log("");
+console.log("################################################################################");
+console.log("# StormRETS Push Client                                                        #");
+console.log("################################################################################");
+console.log("");
+console.log("[-] Initializing");
 
-var faye = require('faye');
-var client = new faye.Client('http://www.stormrets.com:8080/firehose', {
-    retry: 5,
-    timeout: 300
+var WebSocketClient = require('websocket').client;
+var client = new WebSocketClient();
+var https = require('https');
+var url = require('url');
+var zlib = require('zlib');
+
+client.on('connectFailed', function(error) {
+    console.log('[-] Connect Error: ' + error.toString());
 });
-client.disable('autodisconnect');
-var subscription = client.subscribe(CHANNEL_NAME, processProperty);
-var subscriptionAuth = {
-    outgoing: function(message, callback) {
-        if (message.channel !== '/meta/subscribe') return callback(message);
-        if (!message.ext) message.ext = {};
-        message.ext.authToken = API_KEY;
-        callback(message);
+
+client.on('connect', function(connection) {
+    console.log('[-] Connected');
+    connection.on('error', function(error) {
+        console.log("[!] Connection Error: " + error.toString());
+    });
+    connection.on('close', function() {
+        console.log('[!] Connection Closed');
+    });
+    connection.on('message', function(message) {
+        if (message.type === 'utf8') {
+            var message_data = JSON.parse(message.utf8Data);
+            var payload = JSON.parse(message_data.data);
+            if (message_data.event == "property") {
+                console.log('[-] Received Property Message, Id: '+payload["id"]);
+                console.log('[-] Fetching Property with Id '+payload["id"]+' via API');
+                https.get({ host: 'www.stormrets.com', path: "/properties/"+payload["id"]+".json?apikey="+API_KEY }, function(res) {
+                    var raw_data = "";
+                    function parseData(d) {
+                        raw_data = raw_data + d
+                    }
+                    res.on('data', parseData);
+                    res.on('end', function (d) {
+                        api_data = JSON.parse(raw_data)
+                        if (api_data.Count == 1) {
+                            console.log('[-] Processing Property with Id '+payload["id"]+' via processProperty()');
+                            processProperty(api_data.Properties[0]);
+                        }
+                    });
+                });
+            }
+        }
+    });
+    function subscribe() {
+        console.log('[-] Subscribing to Channel: '+CHANNEL_NAME);
+        connection.sendUTF(JSON.stringify({"event": "pusher:subscribe", "data": { "channel": CHANNEL_NAME, "auth": API_KEY } }));
     }
-};
-client.addExtension(subscriptionAuth);
-subscription.callback(function() {
-    console.log("Running...");
+    subscribe();
 });
-subscription.errback(function(error) {
-    console.log(error.message);
-});
+client.connect('ws://ws.pusherapp.com/app/e94ad0f506973bbf5ba3');
